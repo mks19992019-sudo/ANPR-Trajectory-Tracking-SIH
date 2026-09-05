@@ -3,11 +3,18 @@ import random
 import time
 import uuid
 from datetime import datetime, timezone
+import os
 import requests
 import sys
 
 from database_manager.cameras_data import CAMERAS, CAMERA_DICT
 from database_manager.routes_data import ROUTES
+
+from backend.app.config import settings
+
+DEFAULT_BASE = os.getenv("BACKEND_URL", "https://anpr-trajectory-tracking-sih.onrender.com").rstrip("/")
+DEFAULT_STREAM_URL = f"{DEFAULT_BASE}/api/v1/events"
+DEFAULT_API_KEY = os.getenv("ANPR_API_KEY", getattr(settings, "ANPR_API_KEY", "local-dev-anpr-4Rz8sN1qK6vP2x"))
 
 PREFIXES = ["RJ14", "RJ45", "DL01", "DL08", "HR26", "UP16", "GJ01", "MH02"]
 LETTERS = ["AB", "CD", "EF", "GH", "JK", "LM", "PZ"]
@@ -25,8 +32,8 @@ class ActiveVehicleJourney:
         self.next_hop_due = time.time()
 
 def run_stream(
-    api_url: str = "http://localhost:8000/api/v1/events",
-    api_key: str = "local-dev-anpr-4Rz8sN1qK6vP2x",
+    api_url: str = DEFAULT_STREAM_URL,
+    api_key: str = DEFAULT_API_KEY,
     rate_hz: float = 1.0,
     inject_anomalies: bool = True
 ):
@@ -110,7 +117,7 @@ def run_stream(
                 hop = journey.route["hops"][journey.current_hop_idx]
                 cam = CAMERA_DICT[hop["camera_id"]]
 
-                base_spd = hop["avg_speed"] + random.uniform(-4.0, 5.0)
+                base_spd = hop.get("speed_kmph", hop.get("avg_speed", 50.0)) + random.uniform(-4.0, 5.0)
                 is_speeding = random.random() < 0.05
                 if is_speeding:
                     base_spd = cam["limit"] + random.uniform(15.0, 30.0)
@@ -162,8 +169,8 @@ def run_stream(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continuous ANPR Stream Simulator")
-    parser.add_argument("--url", default="http://localhost:8000/api/v1/events", help="Backend ingestion endpoint")
-    parser.add_argument("--api-key", default="local-dev-anpr-4Rz8sN1qK6vP2x", help="ANPR Ingestion API Key")
+    parser.add_argument("--url", default=DEFAULT_STREAM_URL, help="Backend ingestion endpoint")
+    parser.add_argument("--api-key", default=DEFAULT_API_KEY, help="ANPR Ingestion API Key")
     parser.add_argument("--rate", type=float, default=1.0, help="Events per second (default: 1.0)")
     parser.add_argument("--no-anomalies", action="store_true", help="Disable periodic anomaly injection")
 

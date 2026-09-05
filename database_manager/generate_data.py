@@ -8,12 +8,14 @@ import random
 import uuid
 from datetime import datetime, timedelta, timezone
 import requests
+import os
 from database_manager.cameras_data import CAMERA_DICT
 from database_manager.routes_data import ROUTES, ROUTE_DICT
 from backend.app.config import settings
 
 DEFAULT_API_KEY = settings.ANPR_API_KEY
-DEFAULT_API_URL = "http://localhost:8000/api/v1/events"
+DEFAULT_BASE = os.getenv("BACKEND_URL", "https://anpr-trajectory-tracking-sih.onrender.com").rstrip("/")
+DEFAULT_API_URL = f"{DEFAULT_BASE}/api/v1/events"
 
 PREFIXES = ["RJ14", "RJ45", "DL08", "HR26", "UP16", "GJ01"]
 LETTERS = ["AB", "CD", "EF", "GH", "JK", "LM", "PZ", "RS", "XY"]

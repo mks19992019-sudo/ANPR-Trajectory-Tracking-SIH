@@ -9,11 +9,12 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'https://anpr-trajectory-tracking-sih.onrender.com',
         changeOrigin: true,
+        secure: false,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'wss://anpr-trajectory-tracking-sih.onrender.com',
         ws: true,
       }
     }

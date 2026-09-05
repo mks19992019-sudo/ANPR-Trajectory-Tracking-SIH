@@ -2,6 +2,7 @@
 System Administration, Reset, and Mock Data Generation Endpoints.
 Allows resetting observations and triggering realistic trajectory generation from API/UI.
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -86,7 +87,8 @@ def generate_traffic_data(payload: GenerateRequest = GenerateRequest()):
     Triggers realistic multi-hop ANPR trajectory generation across Jaipur corridors.
     Pushes data directly through the FastAPI ingestion pipeline.
     """
-    api_url = f"http://localhost:8000{settings.API_PREFIX}/events"
+    port = os.getenv("PORT", "8000")
+    api_url = os.getenv("BACKEND_INTERNAL_URL", f"http://127.0.0.1:{port}{settings.API_PREFIX}/events")
     api_key = settings.ANPR_API_KEY
     try:
         sent = run_generator(

@@ -5,10 +5,12 @@ via the backend deletion endpoint while strictly preserving table columns and sc
 """
 import argparse
 import sys
+import os
 import requests
 
-DEFAULT_DELETE_URL = "http://localhost:8000/api/v1/system/data"
-DEFAULT_STATUS_URL = "http://localhost:8000/api/v1/system/status"
+DEFAULT_BASE = os.getenv("BACKEND_URL", "https://anpr-trajectory-tracking-sih.onrender.com").rstrip("/")
+DEFAULT_DELETE_URL = f"{DEFAULT_BASE}/api/v1/system/data"
+DEFAULT_STATUS_URL = f"{DEFAULT_BASE}/api/v1/system/status"
 
 
 def get_current_status(status_url: str = DEFAULT_STATUS_URL) -> dict | None:
@@ -26,8 +28,10 @@ def delete_all_data(delete_url: str = DEFAULT_DELETE_URL, force: bool = False) -
     print(" ANPR DATABASE MANAGER — RECORD PURGE UTILITY")
     print("=" * 60)
 
+    status_url = delete_url.replace("/data", "/status")
+
     # 1. Fetch current status before deletion
-    status_before = get_current_status()
+    status_before = get_current_status(status_url)
     if status_before:
         print(f"[*] Current Database State:")
         print(f"    - Observations: {status_before.get('total_observations', 0)}")
@@ -35,7 +39,7 @@ def delete_all_data(delete_url: str = DEFAULT_DELETE_URL, force: bool = False) -
         print(f"    - Registered Cameras: {status_before.get('registered_cameras', 0)} (Preserved)")
         print(f"    - Registered Corridors: {status_before.get('registered_corridors', 0)} (Preserved)")
     else:
-        print("[*] Connecting to backend...")
+        print(f"[*] Connecting to backend: {delete_url} ...")
 
     if not force:
         try:
@@ -59,7 +63,7 @@ def delete_all_data(delete_url: str = DEFAULT_DELETE_URL, force: bool = False) -
                     print(f"    • {tbl}")
 
             # Verify after deletion
-            status_after = get_current_status()
+            status_after = get_current_status(status_url)
             if status_after:
                 print(f"\n[*] Verified Post-Purge State:")
                 print(f"    - Observations: {status_after.get('total_observations', 0)}")

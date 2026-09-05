@@ -113,6 +113,7 @@ for c_def in CORRIDORS_DEF:
             "camera_name": cam["name"],
             "direction": cam["direction"],
             "speed_kmph": speeds[i],
+            "avg_speed": speeds[i],
             "speed_limit": cam["limit"],
             "distance_from_prev_km": round(dist_from_prev, 2),
             "transit_seconds": time_sec_from_prev

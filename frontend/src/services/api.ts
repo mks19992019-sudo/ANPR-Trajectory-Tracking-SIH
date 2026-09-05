@@ -10,7 +10,7 @@ import type {
   VehicleObservation
 } from '../types';
 
-const base = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+const base = import.meta.env.VITE_API_BASE_URL || 'https://anpr-trajectory-tracking-sih.onrender.com/api/v1';
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(base + path);
@@ -127,7 +127,7 @@ class ApiService {
 
   subscribeLiveEvents(callback: (e: ANPREvent) => void): () => void {
     let wsUrl: string;
-    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://anpr-trajectory-tracking-sih.onrender.com/api/v1';
     if (apiBase && (apiBase.startsWith('http://') || apiBase.startsWith('https://'))) {
       const parsed = new URL(apiBase);
       const proto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
