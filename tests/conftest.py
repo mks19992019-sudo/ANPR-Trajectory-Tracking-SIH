@@ -8,7 +8,6 @@ from backend.app.database import Base, get_db
 from backend.app.main import app
 from backend.app.seed import seed_database
 
-# Use in-memory SQLite with StaticPool so the single connection persists across requests
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(

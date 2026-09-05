@@ -58,6 +58,9 @@ export interface TrajectoryWaypoint {
   speed_kmph: number;
   latitude: number;
   longitude: number;
+  delta_distance_km?: number;
+  delta_time_seconds?: number;
+  implied_speed_kmph?: number;
   is_anomaly?: boolean;
   anomaly_reason?: string;
 }
@@ -70,6 +73,8 @@ export interface Trajectory {
   total_distance_km: number;
   average_speed_kmph: number;
   camera_count: number;
+  plausibility_status?: string;
+  anomaly_notes?: string | null;
   route_geometry: [number, number][];
   waypoints: TrajectoryWaypoint[];
   anomalies: string[];
@@ -81,10 +86,12 @@ export interface TrafficMetric {
   road_id: string;
   road_name: string;
   camera_id?: string;
-  time_window: string;
+  time_window?: string;
   vehicle_count: number;
   average_speed: number;
   median_speed: number;
+  speed_limit?: number;
+  capacity?: number;
   congestion_score: number;
   congestion_level: CongestionLevel;
 }
@@ -107,7 +114,8 @@ export interface Alert {
   camera_id: string;
   camera_name?: string;
   severity: AlertSeverity;
-  message: string;
+  message?: string;
+  description?: string;
   timestamp: string;
   status: 'OPEN' | 'INVESTIGATING' | 'RESOLVED';
 }

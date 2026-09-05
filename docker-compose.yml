@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostGIS / PostgreSQL Database
+  # PostGIS / PostgreSQL Spatial Database
   db:
     image: postgis/postgis:15-3.3
     container_name: anpr_spatial_db
@@ -16,7 +16,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U anpr_admin -d anpr_traffic_db"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -32,9 +32,13 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://anpr_admin:anpr_secure_password@db:5432/anpr_traffic_db
-      - DEDUPLICATION_WINDOW_SECONDS=5
-      - SPEED_TOLERANCE_KMPH=10.0
-      - IMPOSSIBLE_SPEED_THRESHOLD_KMPH=220.0
+      - DEDUP_WINDOW_SECONDS=5
+      - FUTURE_TIMESTAMP_TOLERANCE_SECONDS=300
+      - IMPOSSIBLE_SPEED_THRESHOLD_KMPH=160.0
+      - SUSPICIOUS_SPEED_THRESHOLD_KMPH=120.0
+      - ANPR_API_KEY=POLICE_ANPR_SECRET_KEY_2026
+      - REQUIRE_API_KEY=false
+      - LOG_LEVEL=INFO
     ports:
       - "8000:8000"
 

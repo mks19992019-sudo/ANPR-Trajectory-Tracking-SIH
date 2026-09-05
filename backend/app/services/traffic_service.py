@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 import numpy as np
 from sqlalchemy.orm import Session
@@ -10,39 +10,77 @@ from backend.app.schemas.schemas import (
     TrafficFlowResponse,
     ODMatrixResponse
 )
+from backend.app.services.congestion_service import CongestionService
+
+# Mapping roads to city geographic zones for OD Matrix analysis
+ROAD_ZONE_MAP = {
+    "RD_001": "Ajmer Expressway Zone",
+    "RD_009": "Ajmer Expressway Zone",
+    "RD_002": "Central MI Road",
+    "RD_008": "Central MI Road",
+    "RD_003": "JL Marg Corridor",
+    "RD_004": "Airport South Zone",
+    "RD_006": "Airport South Zone",
+    "RD_005": "Delhi Highway North",
+    "RD_007": "Delhi Highway North",
+    "RD_010": "Delhi Highway North",
+}
+
+DEFAULT_ZONES = [
+    "Ajmer Expressway Zone",
+    "Central MI Road",
+    "JL Marg Corridor",
+    "Airport South Zone",
+    "Delhi Highway North"
+]
 
 class TrafficService:
     @staticmethod
     def get_city_summary(db: Session) -> TrafficVolumeResponse:
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        """
+        Aggregates real-time city-wide traffic volume, active cameras, average flow speed,
+        and current count of congested road corridors.
+        """
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         
+        # Total vehicle observations today
         total_veh = db.query(VehicleObservation).filter(VehicleObservation.timestamp >= today_start).count()
-        # If today is just starting or empty, count all observations
         if total_veh == 0:
             total_veh = db.query(VehicleObservation).count()
 
         active_cams = db.query(Camera).filter(Camera.status == "ACTIVE").count()
         total_cams = db.query(Camera).count()
         
+        # Real average velocity
         avg_speed_res = db.query(func.avg(VehicleObservation.speed_kmph)).scalar()
-        avg_speed = round(float(avg_speed_res), 1) if avg_speed_res else 46.8
+        avg_speed = round(float(avg_speed_res), 1) if avg_speed_res is not None else 0.0
 
+        # Real active alerts
         active_alerts = db.query(Alert).filter(Alert.status == "OPEN").count()
+
+        # Real congested corridors calculated dynamically
+        congestion_records = CongestionService.calculate_road_congestion(db, minutes=30)
+        congested_count = sum(1 for c in congestion_records if c.congestion_level in ["HIGH", "SEVERE"])
 
         return TrafficVolumeResponse(
             total_vehicles_today=total_veh,
             active_cameras=active_cams,
             total_cameras=total_cams,
             average_speed_city=avg_speed,
-            congested_corridors=3,
+            congested_corridors=congested_count,
             active_alerts=active_alerts,
-            recorded_at=datetime.utcnow()
+            recorded_at=now
         )
 
     @staticmethod
     def get_speed_analytics(db: Session, hours: int = 1) -> List[SpeedAnalyticsResponse]:
-        since = datetime.utcnow() - timedelta(hours=hours)
-        roads = db.query(Road).all()
+        """
+        Computes real speed percentiles (mean, median, 85th percentile, min, max)
+        and speed limit compliance rates across all arterial corridors.
+        """
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        roads = db.query(Road).order_by(Road.road_id.asc()).all()
         results: List[SpeedAnalyticsResponse] = []
 
         for road in roads:
@@ -65,12 +103,12 @@ class TrafficService:
                 compliant = sum(1 for s in speeds if s <= road.speed_limit)
                 compliance_rate = round((compliant / len(speeds)) * 100.0, 1)
             else:
-                avg_spd = road.speed_limit * 0.8
-                med_spd = avg_spd * 0.98
-                min_spd = 18.0
-                max_spd = road.speed_limit * 1.35
-                p85 = avg_spd * 1.18
-                compliance_rate = 94.0
+                avg_spd = 0.0
+                med_spd = 0.0
+                min_spd = 0.0
+                max_spd = 0.0
+                p85 = 0.0
+                compliance_rate = 100.0
 
             results.append(SpeedAnalyticsResponse(
                 road_id=road.road_id,
@@ -89,13 +127,13 @@ class TrafficService:
     @staticmethod
     def get_camera_flows(db: Session, hours: int = 1) -> List[TrafficFlowResponse]:
         """
-        Computes sequential transitions between adjacent cameras:
-        For vehicles observed in chronological order, count transition CAM_A -> CAM_B.
+        Computes sequential transitions between checkpoints:
+        For vehicles observed across multiple cameras, counts transitions CAM_A -> CAM_B.
         """
-        since = datetime.utcnow() - timedelta(hours=hours)
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
         cameras = {c.camera_id: c for c in db.query(Camera).all()}
 
-        # Sample recent observations
+        # Sample recent observations sorted by vehicle and timestamp
         obs_list = db.query(
             VehicleObservation.plate_number,
             VehicleObservation.camera_id,
@@ -117,7 +155,7 @@ class TrafficService:
             prev_cam = cam_id
 
         results: List[TrafficFlowResponse] = []
-        for (c1, c2), count in sorted(transitions.items(), key=lambda x: x[1], reverse=True)[:15]:
+        for (c1, c2), count in sorted(transitions.items(), key=lambda x: x[1], reverse=True)[:20]:
             cam1 = cameras.get(c1)
             cam2 = cameras.get(c2)
             if cam1 and cam2:
@@ -132,61 +170,78 @@ class TrafficService:
                     destination_coords=[cam2.latitude, cam2.longitude]
                 ))
 
-        # If zero transitions in short db history, provide default corridor flows
-        if not results and len(cameras) >= 4:
-            cam_keys = list(cameras.keys())
-            for i in range(min(6, len(cam_keys) - 1)):
-                c1 = cameras[cam_keys[i]]
-                c2 = cameras[cam_keys[i+1]]
-                results.append(TrafficFlowResponse(
-                    source_camera=c1.camera_id,
-                    source_name=c1.camera_name,
-                    destination_camera=c2.camera_id,
-                    destination_name=c2.camera_name,
-                    vehicle_count=1240 - i * 90,
-                    time_window=f"{hours}h",
-                    source_coords=[c1.latitude, c1.longitude],
-                    destination_coords=[c2.latitude, c2.longitude]
-                ))
-
         return results
 
     @staticmethod
-    def get_od_matrix(db: Session) -> ODMatrixResponse:
+    def get_od_matrix(db: Session, hours: int = 24) -> ODMatrixResponse:
         """
-        Creates Origin-Destination matrix from first and last observed locations of vehicles.
+        Dynamically computes Origin-Destination (OD) commuter trip matrix
+        from the first (Origin) and last (Destination) observed checkpoint zones of each vehicle.
         """
-        zones = [
-            "Ajmer Expressway Zone",
-            "Central MI Road",
-            "JL Marg Corridor",
-            "Airport South Zone",
-            "Delhi Highway North"
-        ]
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        zones = list(DEFAULT_ZONES)
+        zone_idx_map = {zone: idx for idx, zone in enumerate(zones)}
+        
+        # Camera to zone mapping
+        cam_zone_map: Dict[str, str] = {}
+        for cam in db.query(Camera).all():
+            zone = ROAD_ZONE_MAP.get(cam.road_id, "Central MI Road")
+            cam_zone_map[cam.camera_id] = zone
 
-        matrix = [
-            [120, 850, 620, 410, 320],
-            [780, 95, 1140, 520, 640],
-            [540, 980, 150, 1260, 480],
-            [320, 460, 1180, 80, 210],
-            [410, 720, 390, 180, 110],
-        ]
+        matrix = [[0 for _ in range(len(zones))] for _ in range(len(zones))]
+
+        # Query all observations in time window
+        obs_records = db.query(
+            VehicleObservation.plate_number,
+            VehicleObservation.camera_id,
+            VehicleObservation.timestamp
+        ).filter(VehicleObservation.timestamp >= since).order_by(
+            VehicleObservation.plate_number,
+            VehicleObservation.timestamp.asc()
+        ).all()
+
+        # Group first and last camera per plate
+        plate_trips: Dict[str, list] = {}
+        for plate, cam_id, _ in obs_records:
+            if plate not in plate_trips:
+                plate_trips[plate] = [cam_id, cam_id]
+            else:
+                plate_trips[plate][1] = cam_id  # Update last observed camera
+
+        # Tally OD matrix
+        for plate, (orig_cam, dest_cam) in plate_trips.items():
+            orig_zone = cam_zone_map.get(orig_cam, "Central MI Road")
+            dest_zone = cam_zone_map.get(dest_cam, "Central MI Road")
+            
+            orig_idx = zone_idx_map.get(orig_zone, 1)
+            dest_idx = zone_idx_map.get(dest_zone, 1)
+            matrix[orig_idx][dest_idx] += 1
 
         return ODMatrixResponse(
             zones=zones,
             matrix=matrix,
-            time_window="24h"
+            time_window=f"{hours}h"
         )
 
     @staticmethod
     def get_heatmap_data(db: Session) -> List[Dict[str, Any]]:
         """
-        Returns GeoJSON-compatible points with intensity based on detection frequency.
+        Returns GeoJSON-compatible point dataset with intensity normalized
+        by actual camera detection counts.
         """
         cameras = db.query(Camera).all()
+        cam_counts = db.query(
+            VehicleObservation.camera_id,
+            func.count(VehicleObservation.observation_id).label("cnt")
+        ).group_by(VehicleObservation.camera_id).all()
+        
+        counts_dict = {c[0]: c[1] for c in cam_counts}
+        max_count = max(counts_dict.values()) if counts_dict else 1
+
         features = []
         for cam in cameras:
-            count = db.query(VehicleObservation).filter(VehicleObservation.camera_id == cam.camera_id).count()
+            count = counts_dict.get(cam.camera_id, 0)
+            intensity = round(min(1.0, count / max(1, max_count)), 3)
             features.append({
                 "type": "Feature",
                 "geometry": {
@@ -196,7 +251,8 @@ class TrafficService:
                 "properties": {
                     "camera_id": cam.camera_id,
                     "camera_name": cam.camera_name,
-                    "intensity": min(1.0, (count + 10) / 100.0)
+                    "observation_count": count,
+                    "intensity": intensity
                 }
             })
         return features

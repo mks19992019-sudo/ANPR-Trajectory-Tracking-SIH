@@ -1,29 +1,35 @@
+import time
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from backend.app.config import settings
 from backend.app.database import engine, Base, SessionLocal
 from backend.app.seed import seed_database
 from backend.app.routers import events, vehicles, cameras, traffic, alerts, blacklist, prediction, websocket
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("anpr_platform")
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("anpr.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create tables and seed initial deterministic data
+    # Startup: Create tables and deterministic initial seed
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
     try:
-        logger.info("Seeding initial checkpoints, roads, blacklist, and demo scenarios...")
+        logger.info("Checking & seeding checkpoint cameras, arterial roads, and blacklist data...")
         seed_database(db)
     finally:
         db.close()
     
-    logger.info("Backend service startup completed.")
+    logger.info(f"{settings.PROJECT_NAME} startup completed.")
     yield
     logger.info("Shutting down backend service.")
 
@@ -34,7 +40,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
+# 1. Request Timing & Structured Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration_ms = round((time.time() - start_time) * 1000, 2)
+    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({duration_ms}ms)")
+    return response
+
+# 2. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -43,7 +58,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health Checks
+# 3. Standardized Global Exception Handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled Exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": "InternalServerError", "detail": "An unexpected server error occurred."}
+    )
+
+# 4. Health and Readiness Probes
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])
 def health_check():
@@ -54,7 +78,21 @@ def health_check():
         "prototype_mode": True
     }
 
-# Register Routers under /api (and /api/v1 for backwards compatibility)
+@app.get("/ready", tags=["Health"])
+@app.get("/api/ready", tags=["Health"])
+def readiness_check():
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "READY", "database": "OPERATIONAL"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "NOT_READY", "error": str(e)}
+        )
+
+# 5. Register Routers under /api and /api/v1
 for prefix in ["/api", "/api/v1"]:
     app.include_router(events.router, prefix=prefix)
     app.include_router(vehicles.router, prefix=prefix)
@@ -63,9 +101,6 @@ for prefix in ["/api", "/api/v1"]:
     app.include_router(alerts.router, prefix=prefix)
     app.include_router(blacklist.router, prefix=prefix)
     app.include_router(prediction.router, prefix=prefix)
-
-# Additional alias for /api/v1/anpr/events
-app.include_router(events.router, prefix="/api/v1/anpr")
 
 # WebSocket Router
 app.include_router(websocket.router)

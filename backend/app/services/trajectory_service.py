@@ -1,8 +1,7 @@
-import json
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from backend.app.models.entities import VehicleObservation, Camera, Trajectory
+from backend.app.models.entities import VehicleObservation, Camera
 from backend.app.schemas.schemas import TrajectoryResponse, TrajectoryWaypoint
 from backend.app.services.alert_service import haversine_distance_km
 from backend.app.config import settings
@@ -10,6 +9,10 @@ from backend.app.config import settings
 class TrajectoryService:
     @staticmethod
     def reconstruct_trajectory(db: Session, plate_number: str) -> Optional[TrajectoryResponse]:
+        """
+        Reconstructs multi-hop spatial route for a vehicle from chronological ANPR observations.
+        Performs temporal/spatial/speed plausibility checks to identify anomalies.
+        """
         clean_plate = plate_number.strip().upper().replace(" ", "").replace("-", "")
 
         # 1. Fetch observations sorted chronologically
@@ -58,26 +61,25 @@ class TrajectoryService:
                 if delta_sec > 0:
                     implied_spd = (delta_dist / delta_sec) * 3600.0
                     
-                    # Physically impossible transition check (e.g. 592 km/h)
+                    # Impossible velocity threshold
                     if implied_spd > settings.IMPOSSIBLE_SPEED_THRESHOLD_KMPH:
                         is_anomaly = True
                         plausibility_status = "PHYSICALLY_IMPOSSIBLE"
                         anomaly_reason = (
                             f"Physically impossible hop: Traveled {delta_dist:.1f} km in {delta_sec:.0f}s "
-                            f"(implied {implied_spd:.1f} km/h). Possible cloned plate / data anomaly."
+                            f"(implied velocity: {implied_spd:.1f} km/h). Potential cloned plate or sensor defect."
                         )
                         anomaly_notes_list.append(anomaly_reason)
-                    elif implied_spd > 120.0:
+                    elif implied_spd > settings.SUSPICIOUS_SPEED_THRESHOLD_KMPH:
                         is_anomaly = True
                         if plausibility_status != "PHYSICALLY_IMPOSSIBLE":
                             plausibility_status = "SUSPICIOUS"
-                        anomaly_reason = f"Unusually rapid transition: implied speed {implied_spd:.1f} km/h."
+                        anomaly_reason = f"Unusually rapid transition: implied velocity {implied_spd:.1f} km/h."
                         anomaly_notes_list.append(anomaly_reason)
                 elif delta_dist > 0.5:
-                    # Traveled distance in 0 seconds!
                     is_anomaly = True
                     plausibility_status = "PHYSICALLY_IMPOSSIBLE"
-                    anomaly_reason = f"Simultaneous detection across distant checkpoints: {delta_dist:.1f} km apart. Possible cloned plate / data anomaly."
+                    anomaly_reason = f"Simultaneous detection across distant checkpoints ({delta_dist:.1f} km apart in 0s)."
                     anomaly_notes_list.append(anomaly_reason)
 
             waypoints.append(TrajectoryWaypoint(
@@ -98,7 +100,6 @@ class TrajectoryService:
             prev_cam = cam
 
         avg_speed = round(total_clocked_speed / len(observations), 1) if observations else 0.0
-
         anomaly_summary = " | ".join(anomaly_notes_list) if anomaly_notes_list else None
 
         return TrajectoryResponse(

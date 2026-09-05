@@ -6,6 +6,7 @@ sqlalchemy>=2.0.28
 psycopg2-binary>=2.9.9
 geoalchemy2>=0.14.4
 shapely>=2.0.3
+alembic>=1.13.1
 pandas>=2.2.1
 numpy>=1.26.4
 xgboost>=2.0.3

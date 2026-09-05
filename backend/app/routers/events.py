@@ -1,44 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from backend.app.database import get_db
 from backend.app.models.entities import VehicleObservation
 from backend.app.schemas.schemas import ANPREventCreate, ANPREventResponse
 from backend.app.services.ingestion_service import IngestionService
+from backend.app.security import verify_api_key
 
 router = APIRouter(tags=["ANPR Ingestion & Events"])
 
 @router.post("/events", response_model=ANPREventResponse, status_code=status.HTTP_201_CREATED)
 async def ingest_anpr_event(
     event_in: ANPREventCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_api_key)
 ):
     """
-    Ingests, validates, deduplicates and registers an ANPR event from the police ANPR system.
-    Evaluates blacklist matching, overspeeding, and impossible hop movement.
+    Securely ingests, validates, deduplicates, and registers an ANPR event from municipal police cameras.
+    Triggers immediate security blacklist and anomaly alerts, broadcasting to live dashboards.
     """
     return await IngestionService.ingest_event(db, event_in)
 
 @router.get("/events", response_model=List[ANPREventResponse])
 def list_anpr_events(
     limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     plate: Optional[str] = None,
     camera_id: Optional[str] = None,
     violation_only: bool = False,
     db: Session = Depends(get_db)
 ):
     """
-    Returns recent ANPR observations with optional filters for plate, camera, and violations.
+    Returns recent ANPR observations with pagination and optional filters for plate, camera, and violations.
     """
     query = db.query(VehicleObservation)
     if plate:
-        query = query.filter(VehicleObservation.plate_number.contains(plate.upper()))
+        clean = plate.strip().upper().replace(" ", "").replace("-", "")
+        query = query.filter(VehicleObservation.plate_number.contains(clean))
     if camera_id:
         query = query.filter(VehicleObservation.camera_id == camera_id)
     if violation_only:
         query = query.filter(VehicleObservation.violation.isnot(None))
 
-    observations = query.order_by(VehicleObservation.timestamp.desc()).limit(limit).all()
+    observations = query.order_by(
+        VehicleObservation.timestamp.desc()
+    ).offset(offset).limit(limit).all()
+    
     return observations
 
 @router.get("/events/{event_id}", response_model=ANPREventResponse)
