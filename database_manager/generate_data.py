@@ -8,8 +8,8 @@ import random
 import uuid
 from datetime import datetime, timedelta, timezone
 import requests
-from generator.cameras_data import CAMERA_DICT
-from generator.routes_data import ROUTES, ROUTE_DICT
+from database_manager.cameras_data import CAMERA_DICT
+from database_manager.routes_data import ROUTES, ROUTE_DICT
 
 DEFAULT_API_KEY = "local-dev-anpr-4Rz8sN1qK6vP2x"
 DEFAULT_API_URL = "http://localhost:8000/api/v1/events"

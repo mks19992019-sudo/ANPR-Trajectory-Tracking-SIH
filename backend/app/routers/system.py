@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from backend.app.database import get_db, engine
 from backend.app.config import settings
 from backend.app.models.entities import Camera, Road, VehicleObservation, Alert
-from generator.generate_data import run as run_generator
+from database_manager.generate_data import run as run_generator
 
 router = APIRouter(prefix="/system", tags=["System Management"])
 
@@ -55,10 +55,11 @@ def get_system_status(db: Session = Depends(get_db)):
 
 
 @router.post("/reset-data", response_model=ResetResponse)
+@router.delete("/data", response_model=ResetResponse)
 def reset_traffic_data():
     """
-    Clears all generated operational ANPR traffic data (observations, alerts, metrics, trajectories).
-    Keeps the camera checkpoints and road network configurations intact.
+    Deletes all operational ANPR traffic data records (observations, alerts, metrics, trajectories).
+    Keeps table columns, schema definitions, cameras, and road networks completely intact.
     """
     tables = ["vehicle_observations", "alerts", "traffic_metrics", "trajectories", "trajectory_points", "audit_logs"]
     try:
@@ -69,7 +70,7 @@ def reset_traffic_data():
             conn.commit()
         return ResetResponse(
             status="SUCCESS",
-            message="All vehicle observations, trajectories, alerts, and metrics have been cleared.",
+            message="All data records have been deleted. Table structures and column names preserved.",
             tables_cleared=tables
         )
     except Exception as e:

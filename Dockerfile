@@ -12,9 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source code and generator
 COPY backend /app/backend
-COPY generator /app/generator
+COPY database_manager /app/database_manager
 COPY alembic.ini /app/alembic.ini
 
 # Environment variables

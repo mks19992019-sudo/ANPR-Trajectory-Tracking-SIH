@@ -1,13 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from sqlalchemy.orm import Session
 from typing import Optional
-from backend.app.database import get_db
+from sqlalchemy import text
+from backend.app.database import get_db, engine
 from backend.app.models.entities import VehicleObservation
 from backend.app.schemas.schemas import ANPREventCreate, ANPREventResponse, PaginatedResponse
 from backend.app.services.ingestion_service import IngestionService
 from backend.app.security import verify_api_key
 
 router = APIRouter(tags=["ANPR Ingestion & Events"])
+
+
+@router.delete("/events", status_code=status.HTTP_200_OK)
+def delete_all_events():
+    """
+    Deletes all vehicle observation records while keeping table structure and columns intact.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("TRUNCATE TABLE vehicle_observations, alerts, traffic_metrics, trajectories, trajectory_points, audit_logs CASCADE;"))
+            conn.commit()
+        return {"status": "SUCCESS", "message": "All vehicle observations and related data records deleted. Table columns and schemas preserved."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete records: {e}")
 
 @router.post("/events", response_model=ANPREventResponse, status_code=status.HTTP_201_CREATED)
 async def ingest_anpr_event(

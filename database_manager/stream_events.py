@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 import requests
 import sys
 
-from generator.cameras_data import CAMERAS, CAMERA_DICT
-from generator.routes_data import ROUTES
+from database_manager.cameras_data import CAMERAS, CAMERA_DICT
+from database_manager.routes_data import ROUTES
 
 PREFIXES = ["RJ14", "RJ45", "DL01", "DL08", "HR26", "UP16", "GJ01", "MH02"]
 LETTERS = ["AB", "CD", "EF", "GH", "JK", "LM", "PZ"]

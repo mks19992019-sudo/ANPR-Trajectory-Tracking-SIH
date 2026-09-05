@@ -2,7 +2,7 @@
 Geographically contiguous arterial corridors across Jaipur Metropolitan ANPR network.
 All hops represent actual connected road transitions between adjacent cameras.
 """
-from generator.cameras_data import CAMERAS, CAMERA_DICT
+from database_manager.cameras_data import CAMERAS, CAMERA_DICT
 import math
 
 def haversine_km(lat1, lon1, lat2, lon2):

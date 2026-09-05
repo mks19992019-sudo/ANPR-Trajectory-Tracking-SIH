@@ -3,7 +3,7 @@ import uuid
 from geoalchemy2.elements import WKTElement
 from sqlalchemy.orm import Session
 from backend.app.models.entities import Road, Camera, Blacklist
-from generator.cameras_data import CAMERAS
+from database_manager.cameras_data import CAMERAS
 
 ROADS = {
  "RD_001": ("Ajmer Expressway Corridor",80,6,3000), "RD_002": ("Mirza Ismail (MI) Arterial",50,4,1800), "RD_003": ("Jawaharlal Nehru (JL) Marg",60,6,2500), "RD_004": ("Airport VIP Expressway",70,4,2000), "RD_005": ("Tonk Road National Highway",60,6,2600), "RD_006": ("Jaipur-Delhi Highway",90,6,3200), "RD_007": ("Sikar Road Industrial Belt",50,4,1900), "RD_008": ("Vaishali Urban Corridor",45,4,1500), "RD_009": ("B2 Bypass Ring Expressway",80,6,2800), "RD_010": ("Heritage Walled City Spine",40,2,1100)}
