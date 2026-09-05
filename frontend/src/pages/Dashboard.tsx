@@ -248,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {alt.severity} • {alt.alert_type.replace(/_/g, ' ')}
                     </span>
                     <span className="text-[10px] font-mono text-slate-500">
-                      {alt.timestamp.split('T')[1]}
+                      {(alt.timestamp || '').includes('T') ? alt.timestamp.split('T')[1].slice(0, 8) : (alt.timestamp || '')}
                     </span>
                   </div>
 
@@ -262,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
 
                   <p className="text-xs text-slate-600 mt-1 leading-snug">
-                    {alt.message}
+                    {alt.message || alt.description || 'Incident flagged by detection rules'}
                   </p>
 
                   <div className="mt-2.5 pt-2 border-t border-slate-200/80 flex items-center justify-between">
@@ -386,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {formatPlate(evt.plate_number, maskPrivacy)}
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                    {evt.camera_id} • {evt.timestamp.split('T')[1]}
+                    {evt.camera_id} • {(evt.timestamp || '').includes('T') ? evt.timestamp.split('T')[1].slice(0, 8) : (evt.timestamp || '')}
                   </div>
                 </div>
                 <div className="text-right">

@@ -6,9 +6,10 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from backend.app.config import settings
-from backend.app.database import SessionLocal
+from backend.app.database import SessionLocal, engine, Base
 from backend.app.seed import seed_database
-from backend.app.routers import events, vehicles, cameras, traffic, alerts, blacklist, prediction, websocket
+from backend.app.models.entities import Road  # registers all models with Base.metadata
+from backend.app.routers import events, vehicles, cameras, traffic, alerts, blacklist, prediction, websocket, system
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -18,7 +19,19 @@ logger = logging.getLogger("anpr.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Schema is owned by Alembic; startup only seeds static reference data.
+    # Ensure PostGIS extension and tables exist before seeding (handles fresh/reset DB gracefully)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"PostGIS extension check: {e}")
+
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.warning(f"Metadata table creation check: {e}")
+
     db = SessionLocal()
     try:
         logger.info("Checking & seeding checkpoint cameras, arterial roads, and blacklist data...")
@@ -87,7 +100,7 @@ def readiness_check():
         )
 
 # All HTTP application routes have one canonical versioned prefix.
-for router in (events.router, vehicles.router, cameras.router, traffic.router, alerts.router, blacklist.router, prediction.router):
+for router in (events.router, vehicles.router, cameras.router, traffic.router, alerts.router, blacklist.router, prediction.router, system.router):
     app.include_router(router, prefix=settings.API_PREFIX)
 
 # WebSocket Router

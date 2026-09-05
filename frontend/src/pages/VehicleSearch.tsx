@@ -277,7 +277,9 @@ export const VehicleSearch: React.FC<VehicleSearchProps> = ({
                             </span>
                             <span className="font-mono font-bold text-slate-900">{wp.camera_id}</span>
                           </div>
-                          <span className="font-mono text-slate-500 text-[11px]">{wp.timestamp.split('T')[1]}</span>
+                          <span className="font-mono text-slate-500 text-[11px]">
+                            {(wp.timestamp || '').includes('T') ? wp.timestamp.split('T')[1].slice(0, 8) : (wp.timestamp || '')}
+                          </span>
                         </div>
 
                         <div className="mt-1 text-slate-700 text-xs truncate pl-7">

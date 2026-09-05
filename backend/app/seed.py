@@ -14,8 +14,9 @@ def seed_database(db: Session) -> None:
     db.flush()
     for item in CAMERAS:
         road_id = item["road_id"].replace("RD_", "RD_0")
-        if road_id not in ROADS:
+        if not db.get(Road, road_id):
             db.add(Road(road_id=road_id, road_name=f"Reference corridor {road_id}", speed_limit_kmph=item["limit"], lanes=2, capacity_per_hour=1200, geometry=WKTElement("LINESTRING(75.80 26.90,75.81 26.91)", srid=4326)))
+            db.flush()
         if not db.get(Camera, item["camera_id"]):
             lat, lon = item["lat"], item["lng"]
             db.add(Camera(camera_id=item["camera_id"], camera_name=item["name"], road_id=road_id, latitude=lat, longitude=lon, location_name=None, direction=item["direction"], status="ACTIVE", location=WKTElement(f"POINT({lon} {lat})", srid=4326)))

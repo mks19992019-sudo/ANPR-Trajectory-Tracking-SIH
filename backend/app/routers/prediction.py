@@ -1,7 +1,13 @@
-from fastapi import APIRouter, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter
 from backend.app.schemas.schemas import ModelUnavailableResponse
-router=APIRouter(prefix="/ml",tags=["ML integration"])
+
+router = APIRouter(prefix="/ml", tags=["ML integration"])
+
+
 @router.get("/prediction", response_model=ModelUnavailableResponse)
 def prediction():
-    return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=ModelUnavailableResponse().model_dump())
+    """Returns model status. Transparently communicates that ML inference requires training."""
+    return ModelUnavailableResponse(
+        status="MODEL_UNAVAILABLE",
+        message="XGBoost model is not loaded. Train traffic_model.json using offline data to activate live inference."
+    )

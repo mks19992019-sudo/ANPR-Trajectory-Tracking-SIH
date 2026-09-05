@@ -118,7 +118,7 @@ export const LiveEvents: React.FC<LiveEventsProps> = ({
                   return (
                     <tr key={evt.event_id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 px-3.5 text-slate-500 text-[11px]">
-                        {evt.timestamp.replace('T', ' ')}
+                        {(evt.timestamp || '').replace('T', ' ').slice(0, 19)}
                       </td>
                       <td className="py-2 px-3.5 font-bold text-blue-900">
                         {formatPlate(evt.plate_number, maskPrivacy)}
@@ -145,7 +145,7 @@ export const LiveEvents: React.FC<LiveEventsProps> = ({
                         )}
                       </td>
                       <td className="py-2 px-3.5 text-slate-600 text-[11px]">
-                        {(evt.confidence * 100).toFixed(0)}%
+                        {(((evt.confidence ?? 0.95) * 100)).toFixed(0)}%
                       </td>
                       <td className="py-2 px-3.5 text-right font-sans">
                         <button

@@ -2,7 +2,7 @@ import argparse
 import random
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 import sys
 
@@ -26,12 +26,14 @@ class ActiveVehicleJourney:
 
 def run_stream(
     api_url: str = "http://localhost:8000/api/v1/events",
+    api_key: str = "local-dev-anpr-4Rz8sN1qK6vP2x",
     rate_hz: float = 1.0,
     inject_anomalies: bool = True
 ):
     print(f"[*] Starting continuous police ANPR synthetic stream...")
     print(f"[*] Ingesting into: {api_url} at ~{rate_hz} events/second")
     print(f"[*] Press Ctrl+C to stop.\n")
+    headers = {"X-API-Key": api_key} if api_key else {}
 
     # Maintain a pool of 25 active vehicles moving across city routes
     active_journeys: list[ActiveVehicleJourney] = []
@@ -48,7 +50,7 @@ def run_stream(
     while True:
         try:
             cycle_tick += 1
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             now_ts = time.time()
 
             # Special Demo Injections
@@ -143,7 +145,7 @@ def run_stream(
 
             # Send HTTP POST to Ingestion API
             try:
-                res = requests.post(api_url, json=event_payload, timeout=2.0)
+                res = requests.post(api_url, json=event_payload, headers=headers, timeout=2.0)
                 event_counter += 1
                 if res.status_code == 201:
                     print(f"[{event_counter:04d}] Sent {event_payload['plate_number']} -> {event_payload['camera_id']} ({event_payload['speed_kmph']} km/h)")
@@ -161,12 +163,14 @@ def run_stream(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continuous ANPR Stream Simulator")
     parser.add_argument("--url", default="http://localhost:8000/api/v1/events", help="Backend ingestion endpoint")
+    parser.add_argument("--api-key", default="local-dev-anpr-4Rz8sN1qK6vP2x", help="ANPR Ingestion API Key")
     parser.add_argument("--rate", type=float, default=1.0, help="Events per second (default: 1.0)")
     parser.add_argument("--no-anomalies", action="store_true", help="Disable periodic anomaly injection")
 
     args = parser.parse_args()
     run_stream(
         api_url=args.url,
+        api_key=args.api_key,
         rate_hz=args.rate,
         inject_anomalies=not args.no_anomalies
     )

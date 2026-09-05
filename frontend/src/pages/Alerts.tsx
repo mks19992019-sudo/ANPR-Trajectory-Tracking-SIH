@@ -129,7 +129,7 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts, maskPrivacy, onInvestiga
                     </span>
                     <span className="text-xs text-slate-400">•</span>
                     <span className="text-xs text-slate-500 font-mono">
-                      {alt.timestamp.replace('T', ' ')}
+                      {(alt.timestamp || '').replace('T', ' ').slice(0, 19)}
                     </span>
                     <span className="text-xs text-slate-400">•</span>
                     <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded uppercase ${
@@ -150,7 +150,7 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts, maskPrivacy, onInvestiga
                   </div>
 
                   <p className="text-xs text-slate-700 leading-relaxed max-w-3xl">
-                    {alt.message}
+                    {alt.message || alt.description || 'Incident flagged by detection rules'}
                   </p>
                 </div>
 
