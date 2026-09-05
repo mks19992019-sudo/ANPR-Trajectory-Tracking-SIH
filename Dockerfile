@@ -15,11 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend source code and generator
 COPY backend /app/backend
 COPY generator /app/generator
+COPY alembic.ini /app/alembic.ini
 
 # Environment variables
 ENV PYTHONPATH=/app
-ENV DATABASE_URL=sqlite:///./traffic_anpr.db
-
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]

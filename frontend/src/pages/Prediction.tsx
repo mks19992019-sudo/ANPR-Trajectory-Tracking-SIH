@@ -9,7 +9,6 @@ import {
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import type { PredictionResult } from '../types';
 import { apiService } from '../services/api';
-import { MOCK_FEATURE_IMPORTANCE } from '../services/mockData';
 
 export const Prediction: React.FC = () => {
   const [predictions, setPredictions] = useState<PredictionResult[]>([]);
@@ -124,7 +123,7 @@ export const Prediction: React.FC = () => {
           </div>
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={MOCK_FEATURE_IMPORTANCE} layout="vertical">
+              <RechartsBarChart data={[]} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" stroke="#64748b" fontSize={11} domain={[0, 0.5]} />
                 <YAxis dataKey="feature" type="category" stroke="#64748b" fontSize={11} width={170} />

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from backend.app.config import settings
-from backend.app.database import engine, Base, SessionLocal
+from backend.app.database import SessionLocal
 from backend.app.seed import seed_database
 from backend.app.routers import events, vehicles, cameras, traffic, alerts, blacklist, prediction, websocket
 
@@ -18,10 +18,7 @@ logger = logging.getLogger("anpr.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create tables and deterministic initial seed
-    logger.info("Initializing database tables...")
-    Base.metadata.create_all(bind=engine)
-    
+    # Schema is owned by Alembic; startup only seeds static reference data.
     db = SessionLocal()
     try:
         logger.info("Checking & seeding checkpoint cameras, arterial roads, and blacklist data...")
@@ -69,17 +66,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # 4. Health and Readiness Probes
 @app.get("/health", tags=["Health"])
-@app.get("/api/health", tags=["Health"])
 def health_check():
     return {
         "status": "HEALTHY",
         "service": "ANPR Traffic Intelligence Engine",
-        "database": "CONNECTED",
-        "prototype_mode": True
+        "database": "unknown"
     }
 
 @app.get("/ready", tags=["Health"])
-@app.get("/api/ready", tags=["Health"])
 def readiness_check():
     try:
         db = SessionLocal()
@@ -92,15 +86,9 @@ def readiness_check():
             content={"status": "NOT_READY", "error": str(e)}
         )
 
-# 5. Register Routers under /api and /api/v1
-for prefix in ["/api", "/api/v1"]:
-    app.include_router(events.router, prefix=prefix)
-    app.include_router(vehicles.router, prefix=prefix)
-    app.include_router(cameras.router, prefix=prefix)
-    app.include_router(traffic.router, prefix=prefix)
-    app.include_router(alerts.router, prefix=prefix)
-    app.include_router(blacklist.router, prefix=prefix)
-    app.include_router(prediction.router, prefix=prefix)
+# All HTTP application routes have one canonical versioned prefix.
+for router in (events.router, vehicles.router, cameras.router, traffic.router, alerts.router, blacklist.router, prediction.router):
+    app.include_router(router, prefix=settings.API_PREFIX)
 
 # WebSocket Router
 app.include_router(websocket.router)

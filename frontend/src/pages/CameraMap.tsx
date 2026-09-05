@@ -11,7 +11,6 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import type { Camera as CameraType } from '../types';
-import { MOCK_ROADS } from '../services/mockData';
 
 const createCameraIcon = (status: CameraType['status'], isSelected = false) => {
   let color = '#2563eb';
@@ -57,17 +56,6 @@ export const CameraMap: React.FC<CameraMapProps> = ({ cameras }) => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           />
-
-          {/* Road Corridors */}
-          {showRoads && MOCK_ROADS.map((road) => (
-            <Polyline
-              key={road.road_id}
-              positions={road.coordinates}
-              color="#3b82f6"
-              weight={3}
-              opacity={0.5}
-            />
-          ))}
 
           {/* Checkpoints */}
           {filteredCameras.map((cam) => {

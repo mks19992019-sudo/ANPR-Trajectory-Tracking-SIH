@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, timezone
+import uuid
 from backend.app.database import get_db
 from backend.app.models.entities import Blacklist, AuditLog
 from backend.app.schemas.schemas import BlacklistResponse, BlacklistCreate
@@ -43,15 +43,15 @@ def add_to_blacklist(
         reason=entry.reason,
         reference_number=entry.reference_number,
         status="ACTIVE",
-        created_at=datetime.now(timezone.utc)
+        blacklist_id=f"BL_{uuid.uuid4().hex[:12]}"
     )
     db.add(new_bl)
 
     audit = AuditLog(
         action_type="BLACKLIST_INSERT",
         entity_id=entry.plate_number,
-        actor="POLICE_ADMIN",
-        details=f"Plate {entry.plate_number} added to blacklist (Ref: {entry.reference_number})"
+        log_id=f"AUD_{uuid.uuid4().hex[:12]}",
+        user_id=None, details=f"Plate {entry.plate_number} added to blacklist (Ref: {entry.reference_number})"
     )
     db.add(audit)
 

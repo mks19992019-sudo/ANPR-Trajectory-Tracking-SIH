@@ -12,7 +12,7 @@ from backend.app.schemas.schemas import (
     AlertResponse,
     AlertUpdate,
     BlacklistResponse,
-    PredictionPlaceholderResponse
+    ModelUnavailableResponse
 )
 
 __all__ = [
@@ -29,5 +29,5 @@ __all__ = [
     "AlertResponse",
     "AlertUpdate",
     "BlacklistResponse",
-    "PredictionPlaceholderResponse"
+    "ModelUnavailableResponse"
 ]

@@ -25,7 +25,7 @@ class ActiveVehicleJourney:
         self.next_hop_due = time.time()
 
 def run_stream(
-    api_url: str = "http://localhost:8000/api/events",
+    api_url: str = "http://localhost:8000/api/v1/events",
     rate_hz: float = 1.0,
     inject_anomalies: bool = True
 ):
@@ -160,7 +160,7 @@ def run_stream(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continuous ANPR Stream Simulator")
-    parser.add_argument("--url", default="http://localhost:8000/api/events", help="Backend ingestion endpoint")
+    parser.add_argument("--url", default="http://localhost:8000/api/v1/events", help="Backend ingestion endpoint")
     parser.add_argument("--rate", type=float, default=1.0, help="Events per second (default: 1.0)")
     parser.add_argument("--no-anomalies", action="store_true", help="Disable periodic anomaly injection")
 

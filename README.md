@@ -82,7 +82,7 @@ A centralized, real-time traffic intelligence and vehicle tracking platform engi
 ## 🛠️ Tech Stack
 
 - **Backend**: Python 3.11+, FastAPI, SQLAlchemy, Pydantic v2, Uvicorn, WebSockets.
-- **Database**: PostgreSQL with PostGIS / SQLite with spatial indexing.
+- **Database**: PostgreSQL with PostGIS only.
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Leaflet GIS Maps, Recharts.
 - **Data Generator**: High-throughput multi-route vehicle simulator with anomaly and duplicate injection.
 - **DevOps**: Docker, Docker Compose, Nginx.

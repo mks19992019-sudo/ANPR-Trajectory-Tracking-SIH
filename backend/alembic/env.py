@@ -33,15 +33,10 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    connect_args = {}
-    if "sqlite" in settings.DATABASE_URL:
-        connect_args["check_same_thread"] = False
-
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        connect_args=connect_args
+        poolclass=pool.NullPool
     )
 
     with connectable.connect() as connection:

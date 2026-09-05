@@ -1,131 +1,38 @@
+"""PostgreSQL/PostGIS persistence model. Observations are the sole ANPR event record."""
 from datetime import datetime, timezone
-from sqlalchemy import (
-    Column,
-    String,
-    Float,
-    Integer,
-    DateTime,
-    Text,
-    ForeignKey,
-    Index
-)
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 from backend.app.database import Base
-
-def utc_now():
-    return datetime.now(timezone.utc)
+def utc_now(): return datetime.now(timezone.utc)
 
 class Road(Base):
-    __tablename__ = "roads"
-
-    road_id = Column(String(50), primary_key=True, index=True)
-    road_name = Column(String(150), nullable=False)
-    speed_limit = Column(Float, nullable=False, default=60.0)
-    lanes = Column(Integer, nullable=False, default=4)
-    capacity = Column(Integer, nullable=False, default=2000)
-    geometry = Column(Text, nullable=True)  # GeoJSON / WKT LineString
-
+ __tablename__="roads"; road_id=Column(String(50),primary_key=True); road_name=Column(String(150),nullable=False); speed_limit_kmph=Column(Float,nullable=False); lanes=Column(Integer,nullable=False,default=1); capacity_per_hour=Column(Integer,nullable=False); geometry=Column(Geometry("LINESTRING",4326)); cameras=relationship("Camera",back_populates="road")
+ __table_args__=(CheckConstraint("speed_limit_kmph > 0"),CheckConstraint("lanes > 0"),CheckConstraint("capacity_per_hour > 0"),Index("ix_roads_geometry","geometry",postgresql_using="gist"))
 class Camera(Base):
-    __tablename__ = "cameras"
-
-    camera_id = Column(String(50), primary_key=True, index=True)
-    camera_name = Column(String(150), nullable=False)
-    road_id = Column(String(50), ForeignKey("roads.road_id"), nullable=True, index=True)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    location = Column(String(200), nullable=True)
-    direction = Column(String(20), nullable=False, default="NORTH")
-    status = Column(String(30), nullable=False, default="ACTIVE")
-    geometry = Column(Text, nullable=True)  # GeoJSON / WKT Point
-
+ __tablename__="cameras"; camera_id=Column(String(50),primary_key=True); camera_name=Column(String(150),nullable=False); road_id=Column(String(50),ForeignKey("roads.road_id",ondelete="RESTRICT"),nullable=False,index=True); latitude=Column(Float,nullable=False); longitude=Column(Float,nullable=False); location_name=Column(String(200)); direction=Column(String(20),nullable=False); status=Column(String(20),nullable=False,default="ACTIVE"); location=Column(Geometry("POINT",4326),nullable=False); road=relationship("Road",back_populates="cameras"); observations=relationship("VehicleObservation",back_populates="camera")
+ __table_args__=(CheckConstraint("latitude BETWEEN -90 AND 90"),CheckConstraint("longitude BETWEEN -180 AND 180"),CheckConstraint("status IN ('ACTIVE','OFFLINE','WARNING')"),Index("ix_cameras_location","location",postgresql_using="gist"))
 class VehicleObservation(Base):
-    __tablename__ = "vehicle_observations"
-
-    observation_id = Column(String(80), primary_key=True, index=True)
-    event_id = Column(String(80), unique=True, index=True, nullable=False)
-    plate_number = Column(String(30), index=True, nullable=False)
-    camera_id = Column(String(50), ForeignKey("cameras.camera_id"), index=True, nullable=False)
-    timestamp = Column(DateTime(timezone=True), index=True, nullable=False)
-    speed_kmph = Column(Float, nullable=False)
-    direction = Column(String(20), nullable=False)
-    vehicle_type = Column(String(30), nullable=False, default="car")
-    violation = Column(String(80), nullable=True)
-    ocr_confidence = Column(Float, nullable=False, default=0.95)
-    created_at = Column(DateTime(timezone=True), default=utc_now)
-
-    __table_args__ = (
-        Index("ix_obs_plate_time", "plate_number", "timestamp"),
-        Index("ix_obs_cam_time", "camera_id", "timestamp"),
-        Index("ix_obs_dedup", "plate_number", "camera_id", "timestamp"),
-    )
-
+ __tablename__="vehicle_observations"; observation_id=Column(String(80),primary_key=True); event_id=Column(String(100),unique=True,nullable=False,index=True); plate_number=Column(String(30),nullable=False,index=True); camera_id=Column(String(50),ForeignKey("cameras.camera_id",ondelete="RESTRICT"),nullable=False,index=True); road_id=Column(String(50),ForeignKey("roads.road_id",ondelete="RESTRICT"),nullable=False,index=True); observed_at=Column(DateTime(timezone=True),nullable=False,index=True); speed_kmph=Column(Float,nullable=False); direction=Column(String(20),nullable=False); vehicle_type=Column(String(30),nullable=False); violation=Column(String(80)); ocr_confidence=Column(Float,nullable=False); latitude=Column(Float,nullable=False); longitude=Column(Float,nullable=False); location=Column(Geometry("POINT",4326),nullable=False); source=Column(String(50),nullable=False,default="ANPR"); deduplication_key=Column(String(160),nullable=False,index=True); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now); camera=relationship("Camera",back_populates="observations"); road=relationship("Road"); trajectory_points=relationship("TrajectoryPoint",back_populates="observation"); alerts=relationship("Alert",back_populates="observation")
+ __table_args__=(CheckConstraint("speed_kmph BETWEEN 0 AND 300"),CheckConstraint("ocr_confidence BETWEEN 0 AND 1"),CheckConstraint("latitude BETWEEN -90 AND 90"),CheckConstraint("longitude BETWEEN -180 AND 180"),Index("ix_obs_plate_time","plate_number","observed_at"),Index("ix_obs_camera_time","camera_id","observed_at"),Index("ix_obs_road_time","road_id","observed_at"),Index("ix_obs_dedup","deduplication_key","observed_at"))
 class Trajectory(Base):
-    __tablename__ = "trajectories"
-
-    trajectory_id = Column(String(80), primary_key=True, index=True)
-    plate_number = Column(String(30), index=True, nullable=False)
-    start_time = Column(DateTime(timezone=True), nullable=False)
-    end_time = Column(DateTime(timezone=True), nullable=False)
-    route_geometry = Column(Text, nullable=False)  # JSON LineString coordinates
-    distance = Column(Float, nullable=False, default=0.0)
-    number_of_observations = Column(Integer, nullable=False, default=1)
-    average_speed = Column(Float, nullable=False, default=0.0)
-    plausibility_status = Column(String(50), nullable=False, default="NORMAL")  # NORMAL, SUSPICIOUS, PHYSICALLY_IMPOSSIBLE
-    anomaly_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utc_now)
-
+ __tablename__="trajectories"; trajectory_id=Column(String(80),primary_key=True); plate_number=Column(String(30),nullable=False,index=True); start_time=Column(DateTime(timezone=True),nullable=False); end_time=Column(DateTime(timezone=True),nullable=False); route_geometry=Column(Geometry("LINESTRING",4326)); distance_km=Column(Float,nullable=False,default=0); average_speed_kmph=Column(Float,nullable=False,default=0); plausibility_status=Column(String(40),nullable=False,default="NORMAL"); anomaly_notes=Column(Text); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now); points=relationship("TrajectoryPoint",back_populates="trajectory",cascade="all, delete-orphan")
+ __table_args__=(Index("ix_trajectory_plate_time","plate_number","start_time"),Index("ix_trajectory_geometry","route_geometry",postgresql_using="gist"))
+class TrajectoryPoint(Base):
+ __tablename__="trajectory_points"; point_id=Column(String(80),primary_key=True); trajectory_id=Column(String(80),ForeignKey("trajectories.trajectory_id",ondelete="CASCADE"),nullable=False); observation_id=Column(String(80),ForeignKey("vehicle_observations.observation_id",ondelete="RESTRICT"),nullable=False); sequence_number=Column(Integer,nullable=False); implied_speed_kmph=Column(Float); is_anomaly=Column(Integer,nullable=False,default=0); trajectory=relationship("Trajectory",back_populates="points"); observation=relationship("VehicleObservation",back_populates="trajectory_points")
+ __table_args__=(UniqueConstraint("trajectory_id","sequence_number"),UniqueConstraint("trajectory_id","observation_id"))
 class TrafficMetric(Base):
-    __tablename__ = "traffic_metrics"
-
-    metric_id = Column(Integer, primary_key=True, autoincrement=True)
-    road_id = Column(String(50), index=True, nullable=False)
-    camera_id = Column(String(50), index=True, nullable=True)
-    time_window = Column(String(20), nullable=False, default="15m")
-    vehicle_count = Column(Integer, nullable=False, default=0)
-    average_speed = Column(Float, nullable=False, default=0.0)
-    median_speed = Column(Float, nullable=False, default=0.0)
-    min_speed = Column(Float, nullable=False, default=0.0)
-    max_speed = Column(Float, nullable=False, default=0.0)
-    percentile_85_speed = Column(Float, nullable=False, default=0.0)
-    congestion_score = Column(Float, nullable=False, default=0.0)
-    congestion_level = Column(String(30), nullable=False, default="LOW")
-    recorded_at = Column(DateTime(timezone=True), default=utc_now, index=True)
-
-    __table_args__ = (
-        Index("ix_metrics_road_time", "road_id", "recorded_at"),
-    )
-
+ __tablename__="traffic_metrics"; metric_id=Column(String(80),primary_key=True); observation_id=Column(String(80),ForeignKey("vehicle_observations.observation_id",ondelete="SET NULL")); road_id=Column(String(50),ForeignKey("roads.road_id"),nullable=False); camera_id=Column(String(50),ForeignKey("cameras.camera_id",ondelete="SET NULL")); window_start=Column(DateTime(timezone=True),nullable=False); window_end=Column(DateTime(timezone=True),nullable=False); volume=Column(Integer,nullable=False); average_speed_kmph=Column(Float); median_speed_kmph=Column(Float); min_speed_kmph=Column(Float); max_speed_kmph=Column(Float); p85_speed_kmph=Column(Float); congestion_score=Column(Float); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now)
+ __table_args__=(CheckConstraint("volume >= 0"),Index("ix_metrics_road_window","road_id","window_start"))
 class Alert(Base):
-    __tablename__ = "alerts"
-
-    alert_id = Column(String(80), primary_key=True, index=True)
-    alert_type = Column(String(80), nullable=False, index=True)
-    severity = Column(String(30), nullable=False, default="MEDIUM")
-    plate_number = Column(String(30), index=True, nullable=False)
-    camera_id = Column(String(50), index=True, nullable=False)
-    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
-    description = Column(Text, nullable=False)
-    status = Column(String(30), nullable=False, default="OPEN")  # OPEN, INVESTIGATING, RESOLVED
-
-    __table_args__ = (
-        Index("ix_alerts_severity_time", "severity", "timestamp"),
-        Index("ix_alerts_status_severity", "status", "severity"),
-    )
-
+ __tablename__="alerts"; alert_id=Column(String(80),primary_key=True); observation_id=Column(String(80),ForeignKey("vehicle_observations.observation_id",ondelete="SET NULL")); alert_type=Column(String(80),nullable=False); severity=Column(String(20),nullable=False); plate_number=Column(String(30),index=True); camera_id=Column(String(50),ForeignKey("cameras.camera_id",ondelete="SET NULL")); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now); description=Column(Text,nullable=False); status=Column(String(20),nullable=False,default="OPEN"); observation=relationship("VehicleObservation",back_populates="alerts")
+ __table_args__=(CheckConstraint("severity IN ('INFO','WARNING','CRITICAL')"),CheckConstraint("status IN ('OPEN','INVESTIGATING','RESOLVED')"),Index("ix_alerts_status_created","status","created_at"))
 class Blacklist(Base):
-    __tablename__ = "blacklist"
-
-    plate_number = Column(String(30), primary_key=True, index=True)
-    reason = Column(Text, nullable=False)
-    reference_number = Column(String(80), nullable=False)
-    status = Column(String(30), nullable=False, default="ACTIVE")
-    created_at = Column(DateTime(timezone=True), default=utc_now)
-
+ __tablename__="blacklist"; blacklist_id=Column(String(80),primary_key=True); plate_number=Column(String(30),unique=True,nullable=False,index=True); reason=Column(Text,nullable=False); reference_number=Column(String(80),nullable=False); status=Column(String(20),nullable=False,default="ACTIVE"); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now)
+class User(Base):
+ __tablename__="users"; user_id=Column(String(80),primary_key=True); username=Column(String(80),unique=True,nullable=False); password_hash=Column(String(255),nullable=False); role=Column(String(30),nullable=False); is_active=Column(Integer,nullable=False,default=1); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now); audit_logs=relationship("AuditLog",back_populates="user")
+class APIClient(Base):
+ __tablename__="api_clients"; client_id=Column(String(80),primary_key=True); name=Column(String(120),unique=True,nullable=False); api_key_hash=Column(String(255),unique=True,nullable=False); is_active=Column(Integer,nullable=False,default=1); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now)
 class AuditLog(Base):
-    __tablename__ = "audit_logs"
-
-    log_id = Column(Integer, primary_key=True, autoincrement=True)
-    action_type = Column(String(80), nullable=False, index=True)
-    entity_id = Column(String(80), nullable=False)
-    actor = Column(String(100), nullable=False, default="SYSTEM")
-    details = Column(Text, nullable=False)
-    timestamp = Column(DateTime(timezone=True), default=utc_now, index=True)
+ __tablename__="audit_logs"; log_id=Column(String(80),primary_key=True); user_id=Column(String(80),ForeignKey("users.user_id",ondelete="SET NULL")); action_type=Column(String(80),nullable=False); entity_id=Column(String(80),nullable=False); details=Column(Text,nullable=False); created_at=Column(DateTime(timezone=True),nullable=False,default=utc_now); user=relationship("User",back_populates="audit_logs")
+ __table_args__=(Index("ix_audit_entity_created","entity_id","created_at"),)

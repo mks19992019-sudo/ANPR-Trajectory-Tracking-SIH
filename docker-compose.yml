@@ -7,9 +7,9 @@ services:
     container_name: anpr_spatial_db
     restart: always
     environment:
-      POSTGRES_USER: anpr_admin
-      POSTGRES_PASSWORD: anpr_secure_password
-      POSTGRES_DB: anpr_traffic_db
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -31,13 +31,12 @@ services:
       db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://anpr_admin:anpr_secure_password@db:5432/anpr_traffic_db
-      - DEDUP_WINDOW_SECONDS=5
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - FUTURE_TIMESTAMP_TOLERANCE_SECONDS=300
       - IMPOSSIBLE_SPEED_THRESHOLD_KMPH=160.0
       - SUSPICIOUS_SPEED_THRESHOLD_KMPH=120.0
-      - ANPR_API_KEY=POLICE_ANPR_SECRET_KEY_2026
-      - REQUIRE_API_KEY=false
+      - ANPR_API_KEY=${ANPR_API_KEY:?set ANPR_API_KEY}
+      - REQUIRE_API_KEY=true
       - LOG_LEVEL=INFO
     ports:
       - "8000:8000"

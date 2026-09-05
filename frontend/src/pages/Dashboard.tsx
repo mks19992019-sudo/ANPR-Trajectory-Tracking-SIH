@@ -19,7 +19,6 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import type { Camera as CameraType, Alert, TrafficMetric, SystemStats, ANPREvent } from '../types';
 import { formatPlate } from '../services/api';
 import type { PageId } from '../components/layout/Sidebar';
-import { MOCK_ROADS } from '../services/mockData';
 
 // Operational pins
 const cameraIcon = new L.DivIcon({
@@ -174,17 +173,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               />
-
-              {/* Road Corridors */}
-              {MOCK_ROADS.map((road) => (
-                <Polyline
-                  key={road.road_id}
-                  positions={road.coordinates}
-                  color="#3b82f6"
-                  weight={2.5}
-                  opacity={0.5}
-                />
-              ))}
 
               {/* Checkpoint Markers */}
               {displayedCameras.map((cam) => {

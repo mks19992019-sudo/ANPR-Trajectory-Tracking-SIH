@@ -53,10 +53,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Center: Subtle Prototype Label */}
+      {/* Center: service label */}
       <div className="hidden md:flex items-center">
         <span className="text-[11px] font-mono tracking-wider px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-500 uppercase">
-          PROTOTYPE • SIMULATED DATA
+          LIVE API DATA
         </span>
       </div>
 

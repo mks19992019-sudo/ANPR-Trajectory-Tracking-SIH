@@ -24,17 +24,7 @@ def list_alerts(
     if status and status.upper() != "ALL":
         query = query.filter(Alert.status == status.upper())
 
-    alerts = query.order_by(Alert.timestamp.desc()).offset(offset).limit(limit).all()
-
-    # Enrich with camera names
-    cam_map = {c.camera_id: c.camera_name for c in db.query(Camera).all()}
-    response = []
-    for a in alerts:
-        res = AlertResponse.model_validate(a)
-        res.camera_name = cam_map.get(a.camera_id, a.camera_id)
-        response.append(res)
-
-    return response
+    return query.order_by(Alert.created_at.desc()).offset(offset).limit(limit).all()
 
 @router.patch("/{alert_id}/status", response_model=AlertResponse)
 @router.patch("/{alert_id}", response_model=AlertResponse)
@@ -62,8 +52,8 @@ def update_alert_status(
     audit = AuditLog(
         action_type="ALERT_STATUS_UPDATE",
         entity_id=alert.alert_id,
-        actor="DISPATCH_OPERATOR",
-        details=f"Alert {alert.alert_id} status transitioned from {old_status} to {norm_status}"
+        user_id=None,
+        log_id=f"AUD_{alert.alert_id}", details=f"Alert {alert.alert_id} status transitioned from {old_status} to {norm_status}"
     )
     db.add(audit)
     db.commit()

@@ -27,7 +27,7 @@ def get_vehicle_history(plate: str, db: Session = Depends(get_db)):
     clean_plate = plate.strip().upper().replace(" ", "").replace("-", "")
     records = db.query(VehicleObservation).filter(
         VehicleObservation.plate_number == clean_plate
-    ).order_by(VehicleObservation.timestamp.asc()).all()
+    ).order_by(VehicleObservation.observed_at.asc()).all()
 
     if not records:
         raise HTTPException(status_code=404, detail=f"No history found for plate '{plate}'.")
