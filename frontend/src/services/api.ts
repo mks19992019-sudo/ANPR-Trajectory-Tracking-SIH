@@ -126,7 +126,16 @@ class ApiService {
   }
 
   subscribeLiveEvents(callback: (e: ANPREvent) => void): () => void {
-    const wsUrl = (location.protocol === 'https:' ? 'wss' : 'ws') + `://${location.host}/ws/traffic`;
+    let wsUrl: string;
+    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    if (apiBase && (apiBase.startsWith('http://') || apiBase.startsWith('https://'))) {
+      const parsed = new URL(apiBase);
+      const proto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${proto}//${parsed.host}/ws/traffic`;
+    } else {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${proto}//${location.host}/ws/traffic`;
+    }
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (e) => {
       try {
