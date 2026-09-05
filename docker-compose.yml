@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # PostGIS / PostgreSQL Database
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: anpr_spatial_db
+    restart: always
+    environment:
+      POSTGRES_USER: anpr_admin
+      POSTGRES_PASSWORD: anpr_secure_password
+      POSTGRES_DB: anpr_traffic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anpr_admin -d anpr_traffic_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anpr_backend_api
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://anpr_admin:anpr_secure_password@db:5432/anpr_traffic_db
+      - DEDUPLICATION_WINDOW_SECONDS=5
+      - SPEED_TOLERANCE_KMPH=10.0
+      - IMPOSSIBLE_SPEED_THRESHOLD_KMPH=220.0
+    ports:
+      - "8000:8000"
+
+  # React Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: anpr_frontend_ui
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
