@@ -10,8 +10,9 @@ from datetime import datetime, timedelta, timezone
 import requests
 from database_manager.cameras_data import CAMERA_DICT
 from database_manager.routes_data import ROUTES, ROUTE_DICT
+from backend.app.config import settings
 
-DEFAULT_API_KEY = "local-dev-anpr-4Rz8sN1qK6vP2x"
+DEFAULT_API_KEY = settings.ANPR_API_KEY
 DEFAULT_API_URL = "http://localhost:8000/api/v1/events"
 
 PREFIXES = ["RJ14", "RJ45", "DL08", "HR26", "UP16", "GJ01"]
